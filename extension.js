@@ -34,12 +34,12 @@ function openNewDocumentWithConvertedText(directory, newFileText, fileExtension)
                 }
             );
         }
-    );  
+    );
 }
 
 function toMarkdown() {
     let document = vscode.window.activeTextEditor.document;
-    
+
     // Make sure current file is a Jira file
     const isJiraFile = isCurrentFileValid(document, "jira");
     if (!isJiraFile) {
@@ -48,12 +48,13 @@ function toMarkdown() {
 
     // Convert current file into Markdown formatting
     let markdownFormatted = jira2md.to_markdown(document.getText());
+
     openNewDocumentWithConvertedText(getCurrentDirectory(document), markdownFormatted, ".md");
 }
 
 function toJira() {
     let document = vscode.window.activeTextEditor.document;
-    
+
     // Make sure current file is a Markdown file
     const isMarkdownFile = isCurrentFileValid(document, "md");
     if (!isMarkdownFile) {
@@ -62,25 +63,44 @@ function toJira() {
 
     // Convert current file into JIRA formatting
     let jiraFormatted = jira2md.to_jira(document.getText());
+    // Handle Mermaid snippets
+    jiraFormatted = jiraFormatted.replace(
+        /^(\{code:mermaid\})((.|\n)*?)(\{code\})/gm,
+        convertMermaidCodeSnippetToHTMLMacro()
+    );
+
     openNewDocumentWithConvertedText(getCurrentDirectory(document), jiraFormatted, ".jira");
+}
+
+function convertMermaidCodeSnippetToHTMLMacro() {
+
+    let firstTime = true;
+
+    return function(match, openingCodeTag, mermaidCode, closingCodeTag) {
+
+        let mermaidContainer = `<div class="mermaid">${mermaidCode}</div>`;
+        let mermaidScripts = '<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script><script>mermaid.initialize({ startOnLoad: true });</script>';
+        let template = firstTime === true
+            ? `{html}${mermaidScripts}${mermaidContainer}{html}`
+            : `{html}${mermaidContainer}{html}`;
+
+        firstTime = false;
+
+        return template;
+    }
 }
 
 // Method is called when the extension is first activated
 function activate(context) {
-    console.log('The Markdown <-> JIRA extension is now active!');
+    console.log('The Markdown <-> JIRA extension is now active! Wiley!');
 
     // Register the commands for converting Markdown and JIRA
-    let to_jira = vscode.commands.registerCommand('extension.convertMarkdown',
+    let to_jira = vscode.commands.registerCommand('extension.convertMarkdownWithMermaid',
         function () {
             toJira();
         }
     );
-    let to_markdown = vscode.commands.registerCommand('extension.convertJira', 
-        function () {
-            toMarkdown();
-        }
-    );
-    context.subscriptions.push(to_jira, to_markdown);
+    context.subscriptions.push(to_jira);
 }
 exports.activate = activate;
 
